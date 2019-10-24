@@ -7,6 +7,7 @@
 package gui.frontend;
 
 import ai.BranchingFactorCalculatorBigInteger;
+import ai.BronzeAI;
 import ai.core.AI;
 import ai.core.AIWithComputationBudget;
 import ai.core.ContinuingAI;
@@ -161,7 +162,8 @@ public class FEStatePane extends JPanel {
                    AHTNAI.class,
                    InformedNaiveMCTS.class,
                    PuppetSearchMCTS.class,
-                   SCV.class
+                   SCV.class,
+                   BronzeAI.class
                   };
 
     
