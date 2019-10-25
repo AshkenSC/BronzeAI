@@ -121,7 +121,7 @@ public class WorkerRush extends AbstractionLayerAI {
         }
     }
     
-    public void workersBehavior(List<Unit> workers,Player p, GameState gs) {
+    public void workersBehavior(List<Unit> workers, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         int nbases = 0;
         int resourcesUsed = 0;
