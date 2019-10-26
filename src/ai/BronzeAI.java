@@ -34,10 +34,7 @@ import rts.units.UnitTypeTable;
 
 
 class Const {
-	public static final int SMALL = 16;
-	public static final int MID = 16;
-	public static final int LARGE = 24;
-	
+	public static final int SMALL = 24;
 }
 
 public class BronzeAI extends AbstractionLayerAI {
