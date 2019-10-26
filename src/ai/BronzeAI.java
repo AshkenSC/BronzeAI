@@ -133,9 +133,9 @@ public class BronzeAI extends AbstractionLayerAI {
                     && u.getPlayer() == player
                     && gs.getActionAssignment(u) == null) {
             	if (pgs.getHeight() <= Const.SMALL)
-            		WR.meleeUnitBehavior(u, p, gs);
+            		meleeUnitBehaviorWR(u, p, gs);
             	else
-            		LR.meleeUnitBehavior(u, p, gs);
+            		meleeUnitBehaviorLR(u, p, gs);
             }
         }
 
@@ -148,9 +148,9 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
         if (pgs.getHeight() <= Const.SMALL)
-        	WR.workersBehavior(workers, p, gs);
+        	workersBehaviorWR(workers, p, gs);
         else
-        	LR.workersBehavior(workers, p, pgs);
+        	workersBehaviorLR(workers, p, pgs);
 
         // This method simply takes all the unit actions executed so far, and packages them into a PlayerAction
         return translateActions(player, gs);
