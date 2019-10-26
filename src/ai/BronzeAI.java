@@ -117,7 +117,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
 
         // behavior of barracks:
-        if (pgs.getHeight() <= Const.SMALL) {
+        //if (pgs.getHeight() <= Const.SMALL) {
         	for (Unit u : pgs.getUnits()) {
                 if (u.getType() == barracksType
                        && u.getPlayer() == player
@@ -125,7 +125,7 @@ public class BronzeAI extends AbstractionLayerAI {
                	barracksBehaviorLR(u, p, pgs);
                }
            }
-        }
+        //}
 
         // behavior of melee units:
         for (Unit u : pgs.getUnits()) {
