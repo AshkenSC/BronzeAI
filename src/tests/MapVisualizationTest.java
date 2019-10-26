@@ -32,9 +32,9 @@ public class MapVisualizationTest {
         pgs.toJSON(jsonwriter);
         jsonwriter.flush();
 
-        JFrame w = PhysicalGameStatePanel.newVisualizer(gs,640,640);
-        JFrame w2 = PhysicalGameStatePanel.newVisualizer(new PartiallyObservableGameState(gs,0),640,640, true);
-        JFrame w3 = PhysicalGameStatePanel.newVisualizer(gs,640,640,false,PhysicalGameStatePanel.COLORSCHEME_WHITE);
+        JFrame w = PhysicalGameStatePanel.newVisualizer(gs,1024,1024);	//原来是640
+        JFrame w2 = PhysicalGameStatePanel.newVisualizer(new PartiallyObservableGameState(gs,0),1024,1024, true);
+        JFrame w3 = PhysicalGameStatePanel.newVisualizer(gs,1024,1024,false,PhysicalGameStatePanel.COLORSCHEME_WHITE);
         
     }    
 }

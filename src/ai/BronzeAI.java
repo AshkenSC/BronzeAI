@@ -12,7 +12,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
+import ai.abstraction.AbstractAction;
 import ai.abstraction.AbstractionLayerAI;
+import ai.abstraction.Harvest;
 import ai.abstraction.HeavyRush;
 import ai.abstraction.LightRush;
 import ai.abstraction.RangedRush;
@@ -32,9 +34,10 @@ import rts.units.UnitTypeTable;
 
 
 class Const {
-	public static final int SMALL = 10;
+	public static final int SMALL = 16;
 	public static final int MID = 16;
 	public static final int LARGE = 24;
+	
 }
 
 public class BronzeAI extends AbstractionLayerAI {
@@ -55,6 +58,21 @@ public class BronzeAI extends AbstractionLayerAI {
     public BronzeAI(UnitTypeTable utt, PathFinding pf) {
     	super(pf);	// # set "time budget" and "iteration budget"
     	reset(utt);
+    }
+    
+    // TODO: constructor trying to lead to different AI when constructing
+    public BronzeAI(UnitTypeTable utt, GameState gs) {
+    	// TODO
+    	this(utt);
+    	WorkerRush WR = new WorkerRush(m_utt);
+    	LightRush LR = new LightRush(m_utt);
+    	HeavyRush HR = new HeavyRush(m_utt);
+    	RangedRush RR = new RangedRush(m_utt);
+    	WorkerDefense WD = new WorkerDefense(m_utt);
+    	PhysicalGameState pgs = gs.getPhysicalGameState();
+    	if(pgs.getHeight() <= Const.SMALL) {
+    		
+    	}
     }
 
     // This will be called by microRTS when it wants to create new instances of this bot (e.g., to play multiple games).
@@ -78,13 +96,10 @@ public class BronzeAI extends AbstractionLayerAI {
     public PlayerAction getAction(int player, GameState gs) {
     	PhysicalGameState pgs = gs.getPhysicalGameState();
         
-    	// TODO: Define strategy instances
-    	// 新建各个算法的对象，在PlayerAction中根据地图尺寸调用不同算法
+    	// Define strategy instances
+    	// TODO: Initialize instances of different AIs, call different AIs accordingly in PlayerActions
     	WorkerRush WR = new WorkerRush(m_utt);
     	LightRush LR = new LightRush(m_utt);
-    	HeavyRush HR = new HeavyRush(m_utt);
-    	RangedRush RR = new RangedRush(m_utt);
-    	WorkerDefense WD = new WorkerDefense(m_utt);
     	
     	Player p = gs.getPlayer(player);
 //        System.out.println("LightRushAI for player " + player + " (cycle " + gs.getTime() + ")");
@@ -94,24 +109,22 @@ public class BronzeAI extends AbstractionLayerAI {
             if (u.getType() == baseType
                     && u.getPlayer() == player
                     && gs.getActionAssignment(u) == null) {
-            	//if (pgs.getHeight() <= Const.SMALL)
-            		WR.baseBehavior(u, p, pgs);
-            	//else
-            		//LR.baseBehavior(u, p, pgs);
+            	if (pgs.getHeight() <= Const.SMALL)
+            		baseBehaviorWR(u, p, pgs);
+            	else
+            		baseBehaviorLR(u, p, pgs);
             }
         }
 
         // behavior of barracks:
-        for (Unit u : pgs.getUnits()) {
-            if (u.getType() == barracksType
-                    && u.getPlayer() == player
-                    && gs.getActionAssignment(u) == null) {
-            	if (pgs.getHeight() <= Const.SMALL) {
-            		
-            	}
-            	else
-            		LR.barracksBehavior(u, p, pgs);
-            }
+        if (pgs.getHeight() <= Const.SMALL) {
+        	for (Unit u : pgs.getUnits()) {
+                if (u.getType() == barracksType
+                       && u.getPlayer() == player
+                       && gs.getActionAssignment(u) == null) {
+               	barracksBehaviorLR(u, p, pgs);
+               }
+           }
         }
 
         // behavior of melee units:
@@ -143,9 +156,216 @@ public class BronzeAI extends AbstractionLayerAI {
         return translateActions(player, gs);
     }    
 
-    public void baseBehavior(Unit u,Player p, PhysicalGameState pgs) {
+    // ---------------------
+    // WorkerRush  behaviors
+    // ---------------------
+    public void baseBehaviorWR(Unit u,Player p, PhysicalGameState pgs) {
         if (p.getResources()>=workerType.cost) train(u, workerType);
-    }    
+    }  
+    
+    public void meleeUnitBehaviorWR(Unit u, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        Unit closestEnemy = null;
+        int closestDistance = 0;
+        for(Unit u2:pgs.getUnits()) {
+            if (u2.getPlayer()>=0 && u2.getPlayer()!=p.getID()) { 
+                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                if (closestEnemy==null || d<closestDistance) {
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+            }
+        }
+        if (closestEnemy!=null) {
+            attack(u,closestEnemy);
+        }
+    }
+    
+    public void workersBehaviorWR(List<Unit> workers, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        int nbases = 0;
+        int resourcesUsed = 0;
+        Unit harvestWorker = null;
+        List<Unit> freeWorkers = new LinkedList<Unit>();
+        freeWorkers.addAll(workers);
+        
+        if (workers.isEmpty()) return;
+        
+        for(Unit u2:pgs.getUnits()) {
+            if (u2.getType() == baseType && 
+                u2.getPlayer() == p.getID()) nbases++;
+        }
+        
+        List<Integer> reservedPositions = new LinkedList<Integer>();
+        if (nbases==0 && !freeWorkers.isEmpty()) {
+            // build a base:
+            if (p.getResources()>=baseType.cost + resourcesUsed) {
+                Unit u = freeWorkers.remove(0);
+                buildIfNotAlreadyBuilding(u,baseType,u.getX(),u.getY(),reservedPositions,p,pgs);
+                resourcesUsed+=baseType.cost;
+            }
+        }
+        
+        if (freeWorkers.size()>0) harvestWorker = freeWorkers.remove(0);
+        
+        // harvest with the harvest worker:
+        if (harvestWorker!=null) {
+            Unit closestBase = null;
+            Unit closestResource = null;
+            int closestDistance = 0;
+            for(Unit u2:pgs.getUnits()) {
+                if (u2.getType().isResource) { 
+                    int d = Math.abs(u2.getX() - harvestWorker.getX()) + Math.abs(u2.getY() - harvestWorker.getY());
+                    if (closestResource==null || d<closestDistance) {
+                        closestResource = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            closestDistance = 0;
+            for(Unit u2:pgs.getUnits()) {
+                if (u2.getType().isStockpile && u2.getPlayer()==p.getID()) { 
+                    int d = Math.abs(u2.getX() - harvestWorker.getX()) + Math.abs(u2.getY() - harvestWorker.getY());
+                    if (closestBase==null || d<closestDistance) {
+                        closestBase = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            if (closestResource!=null && closestBase!=null) {
+                AbstractAction aa = getAbstractAction(harvestWorker);
+                if (aa instanceof Harvest) {
+                    Harvest h_aa = (Harvest)aa;
+                    if (h_aa.getTarget() != closestResource || h_aa.getBase()!=closestBase) harvest(harvestWorker, closestResource, closestBase);
+                } else {
+                    harvest(harvestWorker, closestResource, closestBase);
+                }
+            }
+        }
+        
+        for(Unit u:freeWorkers) meleeUnitBehaviorWR(u, p, gs);
+        
+    }
+    
+    // ---------------------
+    // LightRush behaviors
+    // ---------------------
+    public void baseBehaviorLR(Unit u,Player p, PhysicalGameState pgs) {
+    	int nworkers = 0;
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getType() == workerType
+                    && u2.getPlayer() == p.getID()) {
+                nworkers++;
+            }
+        }
+        if (nworkers < 1 && p.getResources() >= workerType.cost) {
+            train(u, workerType);
+        }
+    } 
+    
+    public void barracksBehaviorLR(Unit u, Player p, PhysicalGameState pgs) {
+        if (p.getResources() >= lightType.cost) {
+            train(u, lightType);
+        }
+    }
+
+    public void meleeUnitBehaviorLR(Unit u, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        Unit closestEnemy = null;
+        int closestDistance = 0;
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
+                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                if (closestEnemy == null || d < closestDistance) {
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+            }
+        }
+        if (closestEnemy != null) {
+//            System.out.println("LightRushAI.meleeUnitBehavior: " + u + " attacks " + closestEnemy);
+            attack(u, closestEnemy);
+        }
+    }
+    
+    public void workersBehaviorLR(List<Unit> workers, Player p, PhysicalGameState pgs) {
+        int nbases = 0;
+        int nbarracks = 0;
+
+        int resourcesUsed = 0;
+        List<Unit> freeWorkers = new LinkedList<Unit>();
+        freeWorkers.addAll(workers);
+
+        if (workers.isEmpty()) {
+            return;
+        }
+
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getType() == baseType
+                    && u2.getPlayer() == p.getID()) {
+                nbases++;
+            }
+            if (u2.getType() == barracksType
+                    && u2.getPlayer() == p.getID()) {
+                nbarracks++;
+            }
+        }
+
+        List<Integer> reservedPositions = new LinkedList<Integer>();
+        if (nbases == 0 && !freeWorkers.isEmpty()) {
+            // build a base:
+            if (p.getResources() >= baseType.cost + resourcesUsed) {
+                Unit u = freeWorkers.remove(0);
+                buildIfNotAlreadyBuilding(u,baseType,u.getX(),u.getY(),reservedPositions,p,pgs);
+                resourcesUsed += baseType.cost;
+            }
+        }
+
+        if (nbarracks == 0) {
+            // build a barracks:
+            if (p.getResources() >= barracksType.cost + resourcesUsed && !freeWorkers.isEmpty()) {
+                Unit u = freeWorkers.remove(0);
+                buildIfNotAlreadyBuilding(u,barracksType,u.getX(),u.getY(),reservedPositions,p,pgs);
+                resourcesUsed += barracksType.cost;
+            }
+        }
+
+
+        // harvest with all the free workers:
+        for (Unit u : freeWorkers) {
+            Unit closestBase = null;
+            Unit closestResource = null;
+            int closestDistance = 0;
+            for (Unit u2 : pgs.getUnits()) {
+                if (u2.getType().isResource) {
+                    int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                    if (closestResource == null || d < closestDistance) {
+                        closestResource = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            closestDistance = 0;
+            for (Unit u2 : pgs.getUnits()) {
+                if (u2.getType().isStockpile && u2.getPlayer()==p.getID()) {
+                    int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                    if (closestBase == null || d < closestDistance) {
+                        closestBase = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            if (closestResource != null && closestBase != null) {
+                AbstractAction aa = getAbstractAction(u);
+                if (aa instanceof Harvest) {
+                    Harvest h_aa = (Harvest)aa;
+                    if (h_aa.getTarget() != closestResource || h_aa.getBase()!=closestBase) harvest(u, closestResource, closestBase);
+                } else {
+                    harvest(u, closestResource, closestBase);
+                }
+            }
+        }
+    }
     
     // This will be called by the microRTS GUI to get the
     // list of parameters that this bot wants exposed
