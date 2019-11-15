@@ -250,6 +250,7 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
         
+        for(Unit u:freeWorkers) meleeUnitBehaviorWR(u, p, gs);
     }
     
     // ---------------------
