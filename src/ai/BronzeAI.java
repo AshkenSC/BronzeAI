@@ -3,7 +3,7 @@ package ai;
 /**
  * 
  * Author: Shicheng Ai
- * An AI based on LightRush
+ * An AI based on baseline AIs
  * 
  */
 
@@ -178,36 +178,39 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
     
+    // TODO
     public void workersBehaviorWR(List<Unit> workers, Player p, GameState gs) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
+    	PhysicalGameState pgs = gs.getPhysicalGameState();
         int nbases = 0;
         int resourcesUsed = 0;
         Unit harvestWorker = null;
-        List<Unit> freeWorkers = new LinkedList<Unit>();
-        freeWorkers.addAll(workers);
-        
+        Unit buildBasesWorker = null;
+        Unit buildBarracksWorker = null;
+        List<Unit> freeWorkers = new LinkedList<Unit>(workers);
+
         if (workers.isEmpty()) return;
-        
-        for(Unit u2:pgs.getUnits()) {
-            if (u2.getType() == baseType && 
-                u2.getPlayer() == p.getID()) nbases++;
+
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getType() == baseType &&
+                    u2.getPlayer() == p.getID()) nbases++;
         }
-        
+
+        // If there is no base, attempt to build one
         List<Integer> reservedPositions = new LinkedList<Integer>();
-        if (nbases==0 && !freeWorkers.isEmpty()) {
-            // build a base:
-            if (p.getResources()>=baseType.cost + resourcesUsed) {
-                Unit u = freeWorkers.remove(0);
-                buildIfNotAlreadyBuilding(u,baseType,u.getX(),u.getY(),reservedPositions,p,pgs);
-                resourcesUsed+=baseType.cost;
+        if (nbases == 0 && !freeWorkers.isEmpty()) {
+        	// If the number of resources > base cost + resources used before this round
+            if (p.getResources() >= baseType.cost + resourcesUsed) {
+                buildBasesWorker = freeWorkers.remove(0);
+                buildIfNotAlreadyBuilding(buildBasesWorker, baseType, buildBasesWorker.getX(), buildBasesWorker.getY(), reservedPositions, p, pgs);
+                resourcesUsed += baseType.cost;
             }
         }
+
+        if (freeWorkers.size() > 0) harvestWorker = freeWorkers.remove(0);
         
-        if (freeWorkers.size()>0) harvestWorker = freeWorkers.remove(0);
-        
-        // harvest with the harvest worker:
-        if (harvestWorker!=null) {
-            Unit closestBase = null;
+        // harvest behavior
+        if (harvestWorker != null) {
+        	Unit closestBase = null;
             Unit closestResource = null;
             int closestDistance = 0;
             for(Unit u2:pgs.getUnits()) {
@@ -233,14 +236,19 @@ public class BronzeAI extends AbstractionLayerAI {
                 AbstractAction aa = getAbstractAction(harvestWorker);
                 if (aa instanceof Harvest) {
                     Harvest h_aa = (Harvest)aa;
-                    if (h_aa.getTarget() != closestResource || h_aa.getBase()!=closestBase) harvest(harvestWorker, closestResource, closestBase);
+                    if (h_aa.getTarget() != closestResource || h_aa.getBase()!=closestBase) {
+                        harvest(harvestWorker, closestResource, closestBase);
+                    } else {
+                    }
                 } else {
                     harvest(harvestWorker, closestResource, closestBase);
                 }
             }
+            else if((closestResource==null) && (p.getResources() == 0) && (freeWorkers.isEmpty()))
+            {
+                freeWorkers.add(harvestWorker);
+            }
         }
-        
-        for(Unit u:freeWorkers) meleeUnitBehaviorWR(u, p, gs);
         
     }
     
