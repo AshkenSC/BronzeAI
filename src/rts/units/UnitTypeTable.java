@@ -200,10 +200,10 @@ public class UnitTypeTable  {
                 light.maxDamage = 3;
                 break;
         }
-        light.attackRange = 1;
-        light.produceTime = 80;
-        light.moveTime = 8;
-        light.attackTime = 5;
+        light.attackRange = 1;	// TODO: 1
+        light.produceTime = 80;	
+        light.moveTime = 8;		//TODO: 8
+        light.attackTime = 5;	// TODO: 5
         light.isResource = false;
         light.isStockpile = false;
         light.canHarvest = false;

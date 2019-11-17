@@ -19,6 +19,8 @@ import ai.abstraction.HeavyDefense;
 import ai.abstraction.HeavyRush;
 import ai.abstraction.LightDefense;
 import ai.abstraction.LightRush;
+import ai.abstraction.MyRobot;
+import ai.abstraction.NewAI;
 import ai.abstraction.RangedDefense;
 import ai.abstraction.RangedRush;
 import ai.abstraction.WorkerDefense;
@@ -36,6 +38,7 @@ import ai.abstraction.pathfinding.FloodFillPathFinding;
 import ai.abstraction.pathfinding.GreedyPathFinding;
 import ai.abstraction.pathfinding.PathFinding;
 import ai.ahtn.AHTNAI;
+import ai.competition.tiamat.Tiamat;
 import ai.core.ParameterSpecification;
 import ai.evaluation.EvaluationFunction;
 import ai.evaluation.EvaluationFunctionForwarding;
@@ -61,6 +64,7 @@ import ai.stochastic.UnitActionProbabilityDistribution;
 import gui.MouseController;
 import gui.PhysicalGameStateMouseJFrame;
 import gui.PhysicalGameStatePanel;
+import myBot.Version1;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -126,7 +130,13 @@ public class FEStatePane extends JPanel {
                                 new EvaluationFunctionForwarding(new SimpleEvaluationFunction()),
                                 new SimpleOptEvaluationFunction()};
 
-    public static Class AIs[] = {PassiveAI.class,
+    public static Class AIs[] = {
+    		       NewAI.class,
+    		       Version1.class,
+    		       Tiamat.class,
+    			   MyRobot.class,
+    			   BronzeAI.class,
+    			   PassiveAI.class,
                    MouseController.class,
                    RandomAI.class,
                    RandomBiasedAI.class,
@@ -162,8 +172,7 @@ public class FEStatePane extends JPanel {
                    AHTNAI.class,
                    InformedNaiveMCTS.class,
                    PuppetSearchMCTS.class,
-                   SCV.class,
-                   BronzeAI.class
+                   SCV.class                   
                   };
 
     
