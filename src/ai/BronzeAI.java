@@ -13,6 +13,7 @@ import java.util.Random;
 import ai.abstraction.AbstractAction;
 import ai.abstraction.AbstractionLayerAI;
 import ai.abstraction.Harvest;
+import ai.abstraction.Move;
 import ai.abstraction.pathfinding.AStarPathFinding;
 import ai.abstraction.pathfinding.BFSPathFinding;
 import ai.abstraction.pathfinding.PathFinding;
@@ -25,6 +26,7 @@ import rts.PlayerAction;
 import rts.units.Unit;
 import rts.units.UnitType;
 import rts.units.UnitTypeTable;
+import util.Pair;
 
 
 /*
@@ -37,9 +39,16 @@ public class BronzeAI extends AbstractionLayerAI {
     public static final int MIDDLE = 24;
     public static final int BIG = 32;
     public static final int workerSmall = 1; //16*16以下
-    public static final int workerMiddle = 2;
+    public static final int workerMiddle = 5;
     public static final int workerBig = 4;
     public static final int workerMore = 8;
+
+
+
+    private static List<Unit> lightsList = new LinkedList<>();
+    private static List<Unit> heaysList = new LinkedList<>();
+    private static List<Unit> rangedsList = new LinkedList<>();
+
 
     UnitTypeTable m_utt = null;
     Random r = new Random();
@@ -49,6 +58,7 @@ public class BronzeAI extends AbstractionLayerAI {
     UnitType lightType;
     UnitType rangedType;
     UnitType heavyType;
+
 
     // This is the default constructor that microRTS will call:
     public BronzeAI(UnitTypeTable utt) {
@@ -77,18 +87,22 @@ public class BronzeAI extends AbstractionLayerAI {
     }
 
     //基地行为，只能生产工兵
-    public void baseBehavior(Player p, GameState gs) {
+    public List<Unit> baseBehavior(Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
+        List<Unit> works = new LinkedList<>();
         for(Unit u: pgs.getUnits()) {
             if (u.getType()==baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u)==null) {
-                if (p.getResources() >= workerType.cost && u.getPlayer() == p.getID())
+                if (p.getResources() >= workerType.cost && u.getPlayer() == p.getID()) {
                     train(u, workerType);
+                    works.add(u);
+                }
             }
         }
+        return works;
     }
 
     //产生除了工兵意以外的其他兵, 每个兵营都产生
-    public List<Unit> barracksBehavior(UnitType type, Player p, GameState gs) {
+    public List<Unit> barracksBehavior( Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         List<Unit> list = new LinkedList<>();
         for(Unit u:pgs.getUnits()) {
@@ -140,11 +154,11 @@ public class BronzeAI extends AbstractionLayerAI {
         }
         //策略二：采用Light策略 2
         else if(pgs.getHeight() >= 32 && pgs.getHeight() < 128) {
-            unitsRush(p, gs, 3, 0, 0);
+            unitsRush(p, gs, workerMiddle,3, 1, 5);
         }
         //策略三：采用混合策略，调参数
         else if (pgs.getHeight() >= 128) {
-            unitsRush(p,gs,8,0,4);
+            unitsRush(p,gs,workerBig,0,5,3);
         }
 
         return translateActions(player, gs); //返回操作
@@ -166,6 +180,7 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
         harvestWorkerBehavior(harvestWorker, p, gs);
+
     }
 
     //采矿行为
@@ -255,6 +270,17 @@ public class BronzeAI extends AbstractionLayerAI {
         }
         return list;
     }
+//      无任务兵
+    public List<Unit> countUnitsListUnAssigment(Player p, GameState gs, UnitType type) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        List<Unit> list = new LinkedList<>();
+        for (Unit u : pgs.getUnits()) {
+            if (u.getType() == type && u.getPlayer() == p.getID()&&gs.getActionAssignment(u) == null) {
+                list.add(u);
+            }
+        }
+        return list;
+    }
 
     //数兵
     public int countUnits(Player p, GameState gs, UnitType type) {
@@ -268,61 +294,76 @@ public class BronzeAI extends AbstractionLayerAI {
         return number;
     }
 
-    //策略2：轻兵策略
-    public void unitsRush(Player p, GameState gs, int numLR, int numHR, int numRR) {
+    public int countUnitsUnagginment(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
-        //找到己方基地生产工兵
-        List<Unit> harvestWorkers = countUnitsList(p,gs,workerType);
-
-        int workers = countUnits(p, gs, workerType);
-        if (pgs.getHeight() <= 32 && workers < workerMiddle) {
-            for (Unit u : pgs.getUnits()) {
-                if (u.getType() == baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u) == null) {
-                    baseBehavior(p, gs);
-                    harvestWorkers.add(u);
-                }
-            }
-        } else if (pgs.getHeight() > 32 && workers < workerBig) {
-            for (Unit u : pgs.getUnits()) {
-                if (u.getType() == baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u) == null) {
-                    baseBehavior(p, gs);
-                    harvestWorkers.add(u);
-                }
+        int number = 0;
+        for (Unit u : pgs.getUnits()) {
+            if (u.getType() == type && u.getPlayer() == p.getID() && gs.getActionAssignment(u) ==null) {
+                number++;
             }
         }
-        harvestWorkerBehavior(harvestWorkers, p, gs);
+        return number;
+    }
 
-        List<Unit> rushLights = countUnitsList(p, gs, lightType);
-        if (rushLights.size() < numLR) {
-            barracksBehavior(lightType, p, gs);
+    public int countUnitsAgginment(Player p, GameState gs, UnitType type) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        int number = 0;
+        for (Unit u : pgs.getUnits()) {
+            if (u.getType() == type && u.getPlayer() == p.getID() && gs.getActionAssignment(u) !=null) {
+                number++;
+            }
+        }
+        return number;
+    }
+
+    //策略2：轻兵策略
+    public void unitsRush(Player p, GameState gs,int numWork, int numLR, int numHR, int numRR) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        int maxCost = Math.max(rangedType.cost,Math.max(heavyType.cost, lightType.cost));
+        int workers = countUnits(p,gs,workerType);
+        if(workers < numWork)
+            baseBehavior(p,gs);
+        int resourcesUsed = 0;
+        List<Unit> freeWorkers = countUnitsList(p,gs,workerType);
+        int barracks = countUnits(p,gs,barracksType);
+
+        if (freeWorkers.isEmpty()) {
+            return;
+        }
+        List<Integer> reservedPositions = new LinkedList<Integer>();
+        if (barracks == 0) {
+            // build a barracks:
+            if (p.getResources() >= barracksType.cost && !freeWorkers.isEmpty()) {
+                Unit u = freeWorkers.remove(0);
+                buildIfNotAlreadyBuilding(u,barracksType,u.getX(),u.getY(),reservedPositions,p,pgs);
+            }
+        }
+        harvestWorkerBehavior(freeWorkers,p,gs);
+
+        if(barracks !=0) {
+            if (lightsList.size() < numLR) {
+                lightsList.addAll(barracksBehavior(p, gs, lightType));
+            }
+            else if (rangedsList.size() < numRR)
+                barracksBehavior(p, gs, rangedType);
+            else if (heaysList.size() < numHR)
+                barracksBehavior(p, gs, heavyType);
+        }
+        if(lightsList.size() >= numLR && rangedsList.size() >= numRR && heaysList.size() >= numHR) {
 
         }
-
-        List<Unit> rushRangeds = countUnitsList(p, gs, rangedType);
-        if (rushRangeds.size() < numHR) {
-            barracksBehavior(rangedType, p, gs);
+        System.out.println(lightsList.size());
+        if(lightsList.size() >= numLR  || p.getResources() < maxCost){
+            for (Unit u : pgs.getUnits()) {
+                if (u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == p.getID())
+                    meleeBehavior(u, p, gs);
+            }
+        } else{
+            for (Unit u : pgs.getUnits()) {
+                if (u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == p.getID())
+                    defenseBehavior(u, p, gs);
+            }
         }
-
-        List<Unit> rushHeavys = countUnitsList(p, gs, heavyType);
-        if (rushHeavys.size() < numHR) {
-            barracksBehavior(heavyType, p, gs);
-        }
-
-        if (rushLights.size() <= numLR && rushHeavys.size() <= numHR && rushRangeds.size() <= numRR) {
-//            for(Unit u: gs.getUnits()){
-//                if(u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == p.getID())
-//                    meleeBehavior(u,p,gs);
-//            }
-            for (Unit u : rushLights)
-                meleeBehavior(u, p, gs);
-            for (Unit u : rushHeavys)
-                meleeBehavior(u, p, gs);
-            for (Unit u : rushRangeds)
-                meleeBehavior(u, p, gs);
-
-        }
-
-
     }
 
     public void defenseBehavior(Unit u, Player p, GameState gs) {
