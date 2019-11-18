@@ -81,13 +81,13 @@ public class BronzeAI extends AbstractionLayerAI {
         heavyType = m_utt.getUnitType("Heavy");
     }
 
- // Called by microRTS at each game cycle.
+    // Called by microRTS at each game cycle.
     // Returns the action the bot wants to execute.
     public PlayerAction getAction(int player, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Player p = gs.getPlayer(player);
         // TODO  改进：根据时间选择策略， 思想：
-        //采用workRush的基础是把对方扼杀在摇篮里,根据小地图最优，所以在16*16以下的地图中，都采用workRushPlus
+        //采用workRush的基础是把对方扼杀在摇篮里,根据小地图最优，所以在16*16以下的地图中，都采用workerRushPlusPlus
         //和其他策略的时间差
         //采取策略之前的计算
 
@@ -149,36 +149,9 @@ public class BronzeAI extends AbstractionLayerAI {
         return translateActions(player, gs); //返回操作
     }
     
-    //基地行为，只能生产工兵
-    public List<Unit> baseBehavior(Player p, GameState gs) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        List<Unit> works = new LinkedList<>();
-        for(Unit u: pgs.getUnits()) {
-            if (u.getType()==baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u)==null) {
-                if (p.getResources() >= workerType.cost && u.getPlayer() == p.getID()) {
-                    train(u, workerType);
-                    works.add(u);
-                }
-            }
-        }
-        return works;
-    }
-
-    //产生除了工兵以外的其他兵, 每个兵营都产生
-    public List<Unit> barracksBehavior(Player p, GameState gs, UnitType type) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        List<Unit> list = new LinkedList<>();
-        for(Unit u:pgs.getUnits()) {
-            if (u.getType()==barracksType && u.getPlayer() == p.getID() && gs.getActionAssignment(u)==null) {
-                if (p.getResources() >= type.cost) {
-                    train(u, type);
-                    list.add(u);
-                }
-            }
-        }
-        return list;
-    }
-
+    /*
+     * 策略
+	*/
     
     //策略1：基于workerRush策略
     public void workerRush(Player p, GameState gs) {
@@ -196,109 +169,7 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
         harvestWorkerBehavior(harvestWorker, p, gs);
-
     }
-
-    //采矿行为
-    public void harvestWorkerBehavior(List<Unit> harvestWorkers, Player p, GameState gs) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        Unit closestBase = null;
-        Unit closestResource = null;
-        int closestDistance = 0;
-        for (Unit worker : harvestWorkers) {
-            for (Unit u2 : pgs.getUnits()) {
-                if (u2.getType().isResource) {
-                    int d = Math.abs(u2.getX() - worker.getX()) + Math.abs(u2.getY() - worker.getY());
-                    if (closestResource == null || d < closestDistance) {
-                        closestResource = u2;
-                        closestDistance = d;
-                    }
-                }
-            }
-            closestDistance = 0;
-            for (Unit u2 : pgs.getUnits()) {
-                if (u2.getType().isStockpile && u2.getPlayer() == p.getID()) {
-                    int d = Math.abs(u2.getX() - worker.getX()) + Math.abs(u2.getY() - worker.getY());
-                    if (closestBase == null || d < closestDistance) {
-                        closestBase = u2;
-                        closestDistance = d;
-                    }
-                }
-            }
-            if (closestResource != null && closestBase != null) {
-                AbstractAction aa = getAbstractAction(worker);
-                if (aa instanceof Harvest) {
-                    Harvest h_aa = (Harvest) aa;
-                    if (h_aa.getTarget() != closestResource || h_aa.getBase() != closestBase) {
-                        harvest(worker, closestResource, closestBase);
-                    }
-                } else {
-                    harvest(worker, closestResource, closestBase);
-                }
-            } else if (p.getResources() != 0 && closestBase!=null) {
-                harvest(worker, worker, closestBase);
-            } else {
-                meleeBehavior(worker,p,gs);
-            }
-        }
-    }
-
-    //距离近，疯狂进攻，生产即进攻（任意兵种都可以进攻）
-    public void meleeBehavior(Unit u, Player p, GameState gs) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        Unit closestEnemy = null;
-        int closestDistance = 0;
-        List<Unit> enemyBase = new LinkedList<>();
-        for (Unit u2 : pgs.getUnits()) {
-            if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
-                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-                //攻击非基地目标
-                if ((closestEnemy == null || d < closestDistance) && u2.getType()!=baseType) {
-                    closestEnemy = u2;
-                    closestDistance = d;
-                }
-            }
-        }
-        for (Unit u3 : pgs.getUnits()) {
-            if (u3.getPlayer() >= 0 && u3.getPlayer() != p.getID() && u3.getType()==baseType) {
-              enemyBase.add(u3);
-            }
-        }
-        if (closestEnemy != null) {
-            attack(u, closestEnemy);
-        } else if(!enemyBase.isEmpty()){
-            for(Unit base: enemyBase)
-                attack(u,base);
-        } else{
-            attack(u,null);
-        }
-    }
-
-
-    //归类
-    public List<Unit> countUnitsList(Player p, GameState gs, UnitType type) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        List<Unit> list = new LinkedList<>();
-        for (Unit u : pgs.getUnits()) {
-            if (u.getType() == type && u.getPlayer() == p.getID()) {
-                list.add(u);
-            }
-        }
-        return list;
-    }
-
-    //数兵
-    public int countUnits(Player p, GameState gs, UnitType type) {
-        PhysicalGameState pgs = gs.getPhysicalGameState();
-        int number = 0;
-        for (Unit u : pgs.getUnits()) {
-            if (u.getType() == type && u.getPlayer() == p.getID()) {
-                number++;
-            }
-        }
-        return number;
-    }
-
     
     //策略2： unitRush，动态调整兵种构成
     /**
@@ -384,7 +255,144 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
     }
+    
+    /*
+     * 建筑物行为
+	*/
+    
+    //基地行为，只能生产工兵
+    public List<Unit> baseBehavior(Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        List<Unit> works = new LinkedList<>();
+        for(Unit u: pgs.getUnits()) {
+            if (u.getType()==baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u)==null) {
+                if (p.getResources() >= workerType.cost && u.getPlayer() == p.getID()) {
+                    train(u, workerType);
+                    works.add(u);
+                }
+            }
+        }
+        return works;
+    }
 
+    //兵营行为
+    public List<Unit> barracksBehavior(Player p, GameState gs, UnitType type) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        List<Unit> list = new LinkedList<>();
+        for(Unit u:pgs.getUnits()) {
+            if (u.getType()==barracksType && u.getPlayer() == p.getID() && gs.getActionAssignment(u)==null) {
+                if (p.getResources() >= type.cost) {
+                    train(u, type);
+                    list.add(u);
+                }
+            }
+        }
+        return list;
+    }
+
+    /*
+     * 单位行为
+	*/
+    
+    //采矿行为
+    public void harvestWorkerBehavior(List<Unit> harvestWorkers, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        Unit closestBase = null;
+        Unit closestResource = null;
+        int closestDistance = 0;
+        for (Unit worker : harvestWorkers) {
+            for (Unit u2 : pgs.getUnits()) {
+                if (u2.getType().isResource) {
+                    int d = Math.abs(u2.getX() - worker.getX()) + Math.abs(u2.getY() - worker.getY());
+                    if (closestResource == null || d < closestDistance) {
+                        closestResource = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            closestDistance = 0;
+            for (Unit u2 : pgs.getUnits()) {
+                if (u2.getType().isStockpile && u2.getPlayer() == p.getID()) {
+                    int d = Math.abs(u2.getX() - worker.getX()) + Math.abs(u2.getY() - worker.getY());
+                    if (closestBase == null || d < closestDistance) {
+                        closestBase = u2;
+                        closestDistance = d;
+                    }
+                }
+            }
+            if (closestResource != null && closestBase != null) {
+                AbstractAction aa = getAbstractAction(worker);
+                if (aa instanceof Harvest) {
+                    Harvest h_aa = (Harvest) aa;
+                    if (h_aa.getTarget() != closestResource || h_aa.getBase() != closestBase) {
+                        harvest(worker, closestResource, closestBase);
+                    }
+                } else {
+                    harvest(worker, closestResource, closestBase);
+                }
+            } else if (p.getResources() != 0 && closestBase!=null) {
+                harvest(worker, worker, closestBase);
+            } else {
+                meleeBehavior(worker,p,gs);
+            }
+        }
+    }
+
+    //近战单位行为
+    public void meleeBehavior(Unit u, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        Unit closestEnemy = null;
+        int closestDistance = 0;
+        List<Unit> enemyBase = new LinkedList<>();
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
+                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                //攻击非基地目标
+                if ((closestEnemy == null || d < closestDistance) && u2.getType()!=baseType) {
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+            }
+        }
+        for (Unit u3 : pgs.getUnits()) {
+            if (u3.getPlayer() >= 0 && u3.getPlayer() != p.getID() && u3.getType()==baseType) {
+              enemyBase.add(u3);
+            }
+        }
+        if (closestEnemy != null) {
+            attack(u, closestEnemy);
+        } else if(!enemyBase.isEmpty()){
+            for(Unit base: enemyBase)
+                attack(u,base);
+        } else{
+            attack(u,null);
+        }
+    }
+
+    public void meleeCloseBehavior(Unit u, Player p, GameState gs) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        Unit closestEnemy = null;
+        int closestDistance = 0;
+        List<Unit> enemyBase = new LinkedList<>();
+        for (Unit u2 : pgs.getUnits()) {
+            if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
+                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
+                //攻击非基地目标
+                if ((closestEnemy == null || d < closestDistance)) {
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+            }
+        }
+        if (closestEnemy != null) {
+            attack(u, closestEnemy);
+        }
+        else{
+            attack(u,null);
+        }
+    }
+    
+    //防御行为
     public void defenseBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestEnemy = null;
@@ -414,28 +422,33 @@ public class BronzeAI extends AbstractionLayerAI {
             attack(u, null);
         }
     }
+    
+    /*
+     * 功能函数
+	*/
 
-    public void meleeCloseBehavior(Unit u, Player p, GameState gs) {
+    //归类
+    public List<Unit> countUnitsList(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
-        Unit closestEnemy = null;
-        int closestDistance = 0;
-        List<Unit> enemyBase = new LinkedList<>();
-        for (Unit u2 : pgs.getUnits()) {
-            if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
-                int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-                //攻击非基地目标
-                if ((closestEnemy == null || d < closestDistance)) {
-                    closestEnemy = u2;
-                    closestDistance = d;
-                }
+        List<Unit> list = new LinkedList<>();
+        for (Unit u : pgs.getUnits()) {
+            if (u.getType() == type && u.getPlayer() == p.getID()) {
+                list.add(u);
             }
         }
-        if (closestEnemy != null) {
-            attack(u, closestEnemy);
+        return list;
+    }
+
+    //数兵
+    public int countUnits(Player p, GameState gs, UnitType type) {
+        PhysicalGameState pgs = gs.getPhysicalGameState();
+        int number = 0;
+        for (Unit u : pgs.getUnits()) {
+            if (u.getType() == type && u.getPlayer() == p.getID()) {
+                number++;
+            }
         }
-        else{
-            attack(u,null);
-        }
+        return number;
     }
 
     public List<ParameterSpecification> getParameters() {
