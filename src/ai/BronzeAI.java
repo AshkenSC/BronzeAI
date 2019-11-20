@@ -1,8 +1,9 @@
 package ai;
-
 /**
- * Author: Shicheng Ai, Jianhai Wang
- * An AI based on baseline AIs
+ * @Description TODO
+ * @Author Jianhai Wang
+ * @Date 2019/11/14 15:57
+ * @Version 1.42
  */
 
 import java.util.ArrayList;
@@ -34,15 +35,16 @@ public class BronzeAI extends AbstractionLayerAI {
     public static final int SMALL = 8;
     public static final int MIDDLE = 24;
     public static final int BIG = 32;
-    public static final int WORKER_SMALL = 1; //16*16����
+    public static final int WORKER_SMALL = 1; //16*16以下
     public static final int WORKER_MIDDLE = 2;
     public static final int WORKER_BIG = 4;
     public static final int WORKER_MORE = 8;
-    private static boolean flag = false; //����������ź�
+    private static boolean flag = false; //发起进攻的信号
     private static int DEFENSEDIS = 1;
 
     private static int TIME = 0;
-    //�����Ķ���
+    private static int anInt = 10;  //决定发起进攻的时间长度，越大积累的兵就越多。越小发起总进攻的时间就越快
+    //进攻的队列
 
 
     UnitTypeTable m_utt = null;
@@ -89,8 +91,8 @@ public class BronzeAI extends AbstractionLayerAI {
     public PlayerAction getAction(int player, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Player p = gs.getPlayer(player);
-        // TODO  �Ľ�������ʱ��ѡ����ԣ� ˼�룺
-        //����workRush�Ļ����ǰѶԷ���ɱ��ҡ����,����С��ͼ���ţ�������16*16���µĵ�ͼ�У�������workRushPlus
+        // TODO  改进：根据时间选择策略， 思想：
+        //采用workRush的基础是把对方扼杀在摇篮里,根据小地图最优，所以在16*16以下的地图中，都采用workRushPlus
 
         int produce = barracksType.produceTime + lightType.produceTime - workerType.produceTime;
         List<Unit> myBases = new ArrayList<>();
@@ -105,7 +107,7 @@ public class BronzeAI extends AbstractionLayerAI {
                 }
             }
         }
-        //һ�㶼��һ������
+        //一般都是一个基地
         for (Unit mybase : myBases) {
             for (Unit enemyBase : enemyBases) {
                 minDisBases = Math.min(minDisBases, Math.abs(mybase.getX() - enemyBase.getX()) + Math.abs(mybase.getY() - enemyBase.getY()));
@@ -113,77 +115,108 @@ public class BronzeAI extends AbstractionLayerAI {
         }
 
 
-        //������Ҫ˼�룺
-        //����һ�����ؾ����������С��ͼ�����ã��ý�workerRush��
-        if (pgs.getHeight() <= 16) {
+        //策略主要思想：
+        //策略一：基地距离近，或者小地图都采用（该进workerRush）
+        if (pgs.getHeight() <= 16 && minDisBases >= 4) {
             workerRush(p, gs);
         }
-        //���Զ�������ranged ��ս worker���� ֱ�ӹ��������ͱ�
-        else if (pgs.getHeight() > 16 && pgs.getHeight() < 32)
-            unitsRush(p, gs, 4, 3, 0, 3, 3, true);
+        //策略二：采用ranged 对战 worker策略 直接攻击，不屯兵
+        else if( pgs.getHeight() < 32)
+            unitsRush(p, gs, 4, 0, 0, 3, 3, true);
 
-            //����һ�Ͳ��Զ��������ԣ���������
+            //策略一和策略二经过测试，表现良好
 
-            //�������Ͳ�����
-                /*˼��:numWRһ�㶼Ϊ0
-                    numLR���� = [lightType.hp * Ȩ�� + lightType.attackRange* Ȩ�� +
-                    lightType.attackTime*Ȩ�� + (lightType.minDamage +lightType.maxDamage)*Ȩ��] /
-                    [lightType.cost*Ȩ�� + lightType.produceTime*Ȩ��]
+            //策略三和策略四
+                /*思想:numWR一般都为0
+                    numLR数量 = [lightType.hp * 权重 + lightType.attackRange* 权重 +
+                    lightType.attackTime*权重 + (lightType.minDamage +lightType.maxDamage)*权重] /
+                    [lightType.cost*权重 + lightType.produceTime*权重]
                     +
-                    (pgs.getHeight() * pgs.getWidth() / lightType.produceTime) * Ȩ��;
+                    (pgs.getHeight() * pgs.getWidth() / lightType.produceTime) * 权重;
                  */
 
-            //������������light��ranged��ϵ��㷨
+            //策略三：采用light和ranged结合的算法
 
         else if (pgs.getHeight() >= 32 && pgs.getHeight() < 64) {
-//            int numLR = (lightType.hp * Ȩ�� + lightType.attackRange* Ȩ�� +
-//                    lightType.attackTime*Ȩ�� + (lightType.minDamage +lightType.maxDamage)*Ȩ��) /
-//                    (lightType.cost*Ȩ�� + lightType.produceTime*Ȩ��)
-//                    + (pgs.getHeight() * pgs.getWidth() / lightType.produceTime) * Ȩ��;
-            unitsRush(p, gs, 0, 3, 0, 3, WORKER_BIG, false);
+//            int numLR = (lightType.hp * 权重 + lightType.attackRange* 权重 +
+//                    lightType.attackTime*权重 + (lightType.minDamage +lightType.maxDamage)*权重) /
+//                    (lightType.cost*权重 + lightType.produceTime*权重)
+//                    + (pgs.getHeight() * pgs.getWidth() / lightType.produceTime) * 权重;
+            unitsRush(p, gs, 0, 5, 0, 3, WORKER_BIG, false);
         }
-        //�����������û�ϲ��ԣ�������
+        //策略三：采用混合策略，调参数
         else if (pgs.getHeight() >= 64 && pgs.getHeight() < 128) {
             unitsRush(p, gs, 0, 4, 1, 6, 6, false);
         } else if (pgs.getHeight() >= 128) {
-            unitsRush(p, gs, 0, 8, 4, 10, WORKER_MORE, false);
+            unitsRush(p, gs, 0, 10, 5, 12, WORKER_MORE, false);
         }
 
-        return translateActions(player, gs); //���ز���
+        return translateActions(player, gs); //返回操作
     }
 
-    //---------------------------����1�����ڸĽ�workerRush���ԣ� ��������纯����ʾ----------------------------
+    //---------------------------策略1：基于改进workerRush策略， 调整情况如函数所示----------------------------
     public void workerRush(Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
-        //�ҵ�����������������
-        baseBehavior(p, gs);
+        //找到己方基地生产工兵
+        int number = 0;
+        Unit base = null;
+        boolean lock = false;
         List<Unit> harvestWorker = new LinkedList<Unit>();
-        for (Unit u : pgs.getUnits()) {
-            if (u.getType().canHarvest && u.getPlayer() == p.getID()) {
-                if (harvestWorker.size() < WORKER_SMALL) {
-                    harvestWorker.add(u);
-                } else {
-                    meleeBehavior(u, p, gs);  //ֱ��ȥ����
-                }
+        for(Unit u: pgs.getUnits()){
+            if(u.getType() == baseType && u.getPlayer() == p.getID()){
+                base = u;
+                break;
             }
         }
-        harvestWorkerGroup(harvestWorker, p, gs);
+
+
+        //基地被包围 TODO maps\letMeOut.xml 这个地图资源和基地都会被包围。 目前只能解决基地被包围的情况(注释代码去掉就是基地被包围的情况), 资源被包围不能解决
+        assert base != null;
+        if(base.getX()<=0 ||  pgs.getTerrain(base.getX() - 1,base.getY())==PhysicalGameState.TERRAIN_WALL || !gs.free(base.getX() - 1,base.getY())  ) number++;
+        if(base.getY() <= 0 || pgs.getTerrain(base.getX(),base.getY()-1)==PhysicalGameState.TERRAIN_WALL ||!gs.free(base.getX(),base.getY()-1)) number++;
+        if(base.getX() + 1>= pgs.getWidth() || pgs.getTerrain(base.getX() + 1,base.getY())==PhysicalGameState.TERRAIN_WALL ||!gs.free(base.getX() + 1,base.getY())) number ++;
+        if(base.getY() + 1 >= pgs.getHeight() ||  pgs.getTerrain(base.getX(),base.getY() + 1)==PhysicalGameState.TERRAIN_WALL ||!gs.free(base.getX(),base.getY() + 1)) number ++;
+        if(number >= 3) {
+            lock = true;
+        }
+
+//        if(lock){
+//            for (Unit u : pgs.getUnits()) {
+//                if (u.getType().canHarvest && u.getPlayer() == p.getID()) {
+//                    harvestWorkerBehavior(u, p, gs);
+//                }
+//            }
+//        }
+//        //正常模式
+//        else {
+            baseBehavior(p,gs);
+            for (Unit u : pgs.getUnits()) {
+                if (u.getType().canHarvest && u.getPlayer() == p.getID()) {
+                    if (harvestWorker.size() < WORKER_SMALL) {
+                        harvestWorker.add(u);
+                    } else {
+                        meleeBehavior(u, p, gs);  //直接去攻击
+                    }
+                }
+            }
+            harvestWorkerGroup(harvestWorker,p,gs);
+//        }
 
     }
 
-    //������Ϊ��ֻ����������
+    //基地行为，只能生产工兵
     public void baseBehavior(Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         for (Unit u : pgs.getUnits()) {
             if (u.getType() == baseType && u.getPlayer() == p.getID() && gs.getActionAssignment(u) == null) {
                 if (p.getResources() >= workerType.cost && u.getPlayer() == p.getID()) {
-                    train(u, workerType); //u�ǻ���
+                    train(u, workerType); //u是基地
                 }
             }
         }
     }
 
-    //�������˹����������������, ÿ����Ӫ������
+    //产生除了工兵意以外的其他兵, 每个兵营都产生
     public void barracksBehavior(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         for (Unit u : pgs.getUnits()) {
@@ -195,7 +228,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    //���£�����ɿ���Ϊ���ѹ����ɼ�������Դ���ȷ��ڻ���Ȼ���ڲ�ȡ������Ϊ�������������Դ��
+    //跟新：集体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
     public void harvestWorkerGroup(List<Unit> harvestWorkers, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestBase = null;
@@ -239,7 +272,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    ///���£�����ɿ���Ϊ���ѹ����ɼ�������Դ���ȷ��ڻ���Ȼ���ڲ�ȡ������Ϊ�������������Դ��
+    ///跟新：个体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
     public void harvestWorkerBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestBase = null;
@@ -282,7 +315,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    //���´��룺���������У����ȹ����������ڹ������أ�С��ͼ����Ч��,
+    //更新代码：攻击过程中，优先攻击工兵，在攻击基地（小地图很有效）,
     public void meleeBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestEnemy = null;
@@ -291,7 +324,7 @@ public class BronzeAI extends AbstractionLayerAI {
         for (Unit u2 : pgs.getUnits()) {
             if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
                 int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-                //�����ǻ���Ŀ��
+                //攻击非基地目标
                 if ((closestEnemy == null || d < closestDistance) && u2.getType() != baseType) {
                     closestEnemy = u2;
                     closestDistance = d;
@@ -312,33 +345,33 @@ public class BronzeAI extends AbstractionLayerAI {
             attack(u, null);
         }
     }
-    //-----------------------------------����һ����--------------------------------
+    //-----------------------------------策略一结束--------------------------------
 
 
-    //-----------------------------------���Զ�----------------------------------
+    //-----------------------------------策略二----------------------------------
 
     /**
      * @param p
      * @param gs
-     * @param numWR      ������������
-     * @param numLR      ����lights����
-     * @param numHR      ����heacys����
-     * @param numRR      ����Զ�̱�����
-     * @param harvestNum �ɿ�����
-     * @param f          �Ƿ���۱��� false�ͻ��۱� true�ͽ���
+     * @param numWR      进攻工兵数量
+     * @param numLR      进攻lights数量
+     * @param numHR      进攻heacys数量
+     * @param numRR      进攻远程兵数量
+     * @param harvestNum 采矿数量
+     * @param f          是否积累兵力 false就积累兵 true就进攻
      * @Description
      */
     public void unitsRush(Player p, GameState gs, int numWR, int numLR, int numHR, int numRR, int harvestNum, boolean f) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
-        boolean lock = true; //�жϵ�ͼ�Ƿ�����
+        boolean lock = true; //判断地图是否死锁
 //        int minCost = Math.min(rangedType.cost,Math.min(heavyType.cost, lightType.cost));
 
-        //������Ϊ
+        //基地行为
         int workers = countUnits(p, gs, workerType);
         if (workers < numWR + harvestNum)
             baseBehavior(p, gs);
-        //������Ϊ
-        //��ȡ�з����ؾ���
+        //基地行为
+        //获取敌方基地距离
         int baseDistance = Integer.MAX_VALUE;
         List<Unit> myBases = new ArrayList<>();
         List<Unit> enemyBases = new ArrayList<>();
@@ -351,7 +384,7 @@ public class BronzeAI extends AbstractionLayerAI {
                 }
             }
         }
-        //һ�㶼��һ������
+        //一般都是一个基地
         for (Unit mybase : myBases) {
             for (Unit enemyBase : enemyBases) {
                 baseDistance = Math.min(baseDistance, Math.abs(mybase.getX() - enemyBase.getX()) + Math.abs(mybase.getY() - enemyBase.getY()));
@@ -363,7 +396,7 @@ public class BronzeAI extends AbstractionLayerAI {
 //            if(worker.getType()==workerType && worker.getPlayer() == p.getID() ) {
 //                UnitActionAssignment uaa = gs.getActionAssignment(worker);
 //                if (uaa != null ) {
-//                    System.out.println("--------------����������=================");
+//                    System.out.println("--------------工兵任务是=================");
 //                    System.out.println(uaa.action.getType());
 //                }
 //
@@ -371,8 +404,8 @@ public class BronzeAI extends AbstractionLayerAI {
 //            }
 //        }
 
-        //------------------------�����ǹ�����Ϊ-------------------------------------
-        //���й�������
+        //------------------------以下是工兵行为-------------------------------------
+        //所有工兵数量
         List<Unit> freeWorkers = countUnitsList(p, gs, workerType);
         List<Unit> harvestWorkers = new LinkedList<>();
         int nbases = countUnits(p, gs, baseType);
@@ -384,7 +417,7 @@ public class BronzeAI extends AbstractionLayerAI {
 
         List<Integer> reservedPositions = new LinkedList<Integer>();
 
-        //������   ע��:��Ϊ���ܸ��ǣ��������λ�ȡ�б����Ըı���Ϊ�������Ի�ȡ����
+        //建基地   注意:行为不能覆盖，不能两次获取列表（可以改变行为），可以获取个数
         if (nbases == 0) {
             if (p.getResources() >= baseType.cost && !freeWorkers.isEmpty()) {
                 Unit u = freeWorkers.remove(0);
@@ -392,7 +425,7 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
 
-        //����Ӫ  ע��:��Ϊ���ܸ��ǣ��������λ�ȡ�б����Ըı���Ϊ�������Ի�ȡ����
+        //建兵营  注意:行为不能覆盖，不能两次获取列表（可以改变行为），可以获取个数
         if (barracks == 0) {
             if (p.getResources() >= barracksType.cost && !freeWorkers.isEmpty()) {
                 Unit u = freeWorkers.remove(0);
@@ -400,7 +433,7 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
 
-        //worker�������
+        //worker任务分类
         for (Unit u : freeWorkers) {
             if (harvestWorkers.size() >= harvestNum) {
                 meleeCloseBehavior(u, p, gs);
@@ -409,10 +442,10 @@ public class BronzeAI extends AbstractionLayerAI {
         }
 
         harvestWorkerGroup(harvestWorkers, p, gs);
-        //-------------------------�����ǹ�����Ϊ---------------------------------------
+        //-------------------------以上是工兵行为---------------------------------------
 
 
-        //���������ڵȴ�״̬��������,ֻҪ��һ���������˶������������
+        //工兵都处于等待状态则发生死锁,只要有一个工兵在运动，则死锁解除
         for (Unit worker : pgs.getUnits()) {
             if (worker.getPlayer() == p.getID() && worker.getType() == workerType) {
                 UnitActionAssignment uaa = gs.getActionAssignment(worker);
@@ -423,23 +456,21 @@ public class BronzeAI extends AbstractionLayerAI {
                 }
             }
         }
+
         if (lock) {
             TIME++;
-            if (TIME % 10 == 9) {
-                lock = true;
-            } else
-                lock = false;
+            lock = TIME % anInt == anInt - 1;
         }
 
-        //-------------------------��Ӫ��Ϊ-------------------------------------
-        //��ȡ��ǰ���ֵ�������
+        //-------------------------兵营行为-------------------------------------
+        //获取当前各种的总数量
         int numL = countUnits(p, gs, lightType);
         int numR = countUnits(p, gs, rangedType);
         int numH = countUnits(p, gs, heavyType);
         int total = numL + numR + numH;
 
 
-        //����˳��
+        //产兵顺序  这样造兵是为了保持造兵平衡
         if (barracks != 0) {
             if (numL < (numLR + 1) / 2 && p.getResources() >= lightType.cost)
                 barracksBehavior(p, gs, lightType);
@@ -447,51 +478,51 @@ public class BronzeAI extends AbstractionLayerAI {
                 barracksBehavior(p, gs, rangedType);
             else if (numH < (numHR + 1) / 2 && p.getResources() >= heavyType.cost)
                 barracksBehavior(p, gs, heavyType);
-            else if (numL < total * numLR / (numLR + numLR + numHR) && p.getResources() >= lightType.cost) { //ranged̫��ʱ
+            else if (numL < total * numLR / (numRR + numLR + numHR) && p.getResources() >= lightType.cost) { //ranged太多时
                 barracksBehavior(p, gs, lightType);
-            } else if (numR < total * numRR / (numLR + numLR + numHR) && p.getResources() >= rangedType.cost) {
+            } else if (numR < total * numRR / (numRR + numLR + numHR) && p.getResources() >= rangedType.cost) {
                 barracksBehavior(p, gs, rangedType);
-            } else if (numH < total * numHR / (numLR + numLR + numHR) && p.getResources() >= heavyType.cost)
+            } else if (numH < total * numHR / (numRR + numLR + numHR) && p.getResources() >= heavyType.cost)
                 barracksBehavior(p, gs, heavyType);
             else
                 barracksBehavior(p, gs, lightType);
 
         }
-        //-------------------------��Ӫ��Ϊ����-----------------------------------
+        //-------------------------兵营行为结束-----------------------------------
 
 
-        //------------------------������������������Ϊ------------------------------
+        //------------------------除工兵以外其他兵行为------------------------------
 
-        //����ͳ�Ʊ������
+        //重新统计兵力情况
         numL = countUnits(p, gs, lightType);
         numR = countUnits(p, gs, rangedType);
         numH = countUnits(p, gs, heavyType);
         total = numL + numR + numH;
-        //�ж����޿�
+        //判断有无矿
         int resource = 0;
         for (Unit u : pgs.getUnits()) {
             if (u.getType() == resourceType) {
                 resource++;
             }
         }
-        //�����Ȼ��۱���
-        //��ͼ��Դ�޿���ȫ������
+        //策略先积累兵力
+        //地图资源无矿则全部进攻
         if (resource == 0) {
             for (Unit u : pgs.getUnits()) {
                 if (u.getType().canAttack && u.getPlayer() == p.getID()) {
-                    //�ǹ���
+                    //非工兵
                     if (!u.getType().canHarvest) {
                         meleeCloseBehavior(u, p, gs);
                     }
-                    //��������Դ�Ž������ڽ���
+                    //工兵把资源放进基地在进攻
                     else {
                         harvestWorkerBehavior(u, p, gs);
                     }
                 }
             }
         }
-        //�������߻��۱�����,���߶�����غܽ��ͽ��������������ⶼ����(flagΪ�����ź�)��ֻҪ�����˾�һֱ����
-        else if (total >= (numLR + numLR + numHR) || f || flag || DEFENSEDIS > baseDistance / 2 || (p.getResources() < lightType.cost && pgs.getHeight() >128)) {
+        //死锁或者积累兵够了,或者对面基地很近就进攻，除工兵以外都进攻(flag为进攻信号)，只要进攻了就一直进攻
+        else if (total >= (numRR + numLR + numHR) || f || flag || (DEFENSEDIS > baseDistance / 2) || (p.getResources() < lightType.cost && pgs.getHeight() > 128)) {
             flag = true;
             for (Unit u : pgs.getUnits()) {
                 if (u.getType().canAttack && !u.getType().canHarvest && u.getPlayer() == p.getID())
@@ -506,11 +537,11 @@ public class BronzeAI extends AbstractionLayerAI {
                 }
             }
         }
-        //-----------------------------����������ı�����Ϊ����------------------------------------
+        //-----------------------------除工兵以外的兵种行为结束------------------------------------
     }
 
 
-    //����Unit���͹���
+    //按照Unit类型归类
     public List<Unit> countUnitsList(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         List<Unit> list = new LinkedList<>();
@@ -522,7 +553,7 @@ public class BronzeAI extends AbstractionLayerAI {
         return list;
     }
 
-    //ͳ���ض����͵ı�������
+    //统计特定类型的兵种数量
     public int countUnits(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         int number = 0;
@@ -534,14 +565,14 @@ public class BronzeAI extends AbstractionLayerAI {
         return number;
     }
 
-    //���ݿɹ��������������⣩�趨������Χ
+    //根据可攻击（除工兵以外）设定防御范围
     public void defenseBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestEnemy = null;
         int canAttack = 0;
         for (Unit unit : pgs.getUnits()) {
             if (unit.getType().canAttack && !unit.getType().canHarvest && p.getID() == unit.getPlayer()) {
-//                System.out.println("____________����__________");
+//                System.out.println("____________任务__________");
 //                UnitActionAssignment uaa = gs.getActionAssignment(unit);
 //                if(uaa!=null){
 //                    System.out.println(uaa.action.getType());
@@ -551,11 +582,20 @@ public class BronzeAI extends AbstractionLayerAI {
                 canAttack++;
             }
         }
-        int defenceDistance = rangedType.attackRange + DEFENSEDIS;
-        System.out.println("------------------����������---------------------");
-        System.out.println(defenceDistance);
+        //与基地的距离,决定占位
+        int heavyDefenseDistance = rangedType.attackRange + DEFENSEDIS  + 3;
+        int lightseDefenseDistance = lightType.attackRange + DEFENSEDIS + 2;
+        int rangedDefenseDistance = heavyType.attackRange + DEFENSEDIS  + 1;
+
+        //身边的距离
         int closestDistance = 0;
-        int attackarea = lightType.attackRange + 2;
+        int lightAttackarea =  lightType.attackRange + 3;
+        int heavyAttackarea =  lightType.attackRange + 2;
+        int rangedAttackarea = lightType.attackRange + 4;
+//        int lightAttackarea =  DEFENSEDIS + 1;
+//        int heavyAttackarea =  DEFENSEDIS + 1;
+//        int rangedAttackarea = DEFENSEDIS + 3;
+
 
         int mybase = 0;
         for (Unit u2 : pgs.getUnits()) {
@@ -570,12 +610,28 @@ public class BronzeAI extends AbstractionLayerAI {
             }
         }
 
-
-        if (closestEnemy != null && (closestDistance < attackarea || mybase < defenceDistance)) {
-            attack(u, closestEnemy);
-        } else {
-            attack(u, null);
+        if (u.getType() == heavyType) {
+            if (closestEnemy != null && (closestDistance < heavyAttackarea || mybase < heavyDefenseDistance)) {
+                attack(u, closestEnemy);
+            } else {
+                attack(u, null);
+            }
         }
+        else if(u.getType() == lightType){
+            if (closestEnemy != null && (closestDistance < lightAttackarea || mybase < lightseDefenseDistance)) {
+                attack(u, closestEnemy);
+            } else {
+                attack(u, null);
+            }
+        }
+        else{
+            if (closestEnemy != null && (closestDistance < rangedAttackarea || mybase < rangedDefenseDistance)) {
+                attack(u, closestEnemy);
+            } else {
+                attack(u, null);
+            }
+        }
+
 
     }
 
@@ -590,7 +646,7 @@ public class BronzeAI extends AbstractionLayerAI {
                 for (Unit u2 : pgs.getUnits()) {
                     if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
                         int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-                        //�����ǻ���Ŀ��
+                        //攻击非基地目标
                         if ((closestEnemy == null || d < closestDistance)) {
                             closestEnemy = u2;
                             closestDistance = d;
@@ -609,12 +665,33 @@ public class BronzeAI extends AbstractionLayerAI {
     public void meleeCloseBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestEnemy = null;
+//        int closestDistance = 0;
         int closestDistance = 0;
         for (Unit u2 : pgs.getUnits()) {
             if (u2.getPlayer() >= 0 && u2.getPlayer() != p.getID()) {
                 int d = Math.abs(u2.getX() - u.getX()) + Math.abs(u2.getY() - u.getY());
-                //�����ǻ���Ŀ��
-                if ((closestEnemy == null || d < closestDistance)) {
+                //攻击非基地目标
+//                if ((closestEnemy == null || d < closestDistance)) {
+//                    closestEnemy = u2;
+//                    closestDistance = d;
+//                }
+                if(closestEnemy == null){
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }else if(closestEnemy.getType() == workerType || d < closestDistance)
+                {
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+                else if(closestEnemy.getType() == rangedType || d < closestDistance){
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+                else if(closestEnemy.getType() == lightType || d < closestDistance){
+                    closestEnemy = u2;
+                    closestDistance = d;
+                }
+                else{
                     closestEnemy = u2;
                     closestDistance = d;
                 }
