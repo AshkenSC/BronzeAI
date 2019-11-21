@@ -155,6 +155,7 @@ public class BronzeAI extends AbstractionLayerAI {
     }
 
     //---------------------------策略1：基于改进workerRush策略， 调整情况如函数所示----------------------------
+    
     public void workerRush(Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         //找到己方基地生产工兵
@@ -216,7 +217,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    //产生除了工兵意以外的其他兵, 每个兵营都产生
+    //兵营行为，产生除了工兵以外的其他兵
     public void barracksBehavior(Player p, GameState gs, UnitType type) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         for (Unit u : pgs.getUnits()) {
@@ -228,7 +229,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    //跟新：集体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
+    //更新：集体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
     public void harvestWorkerGroup(List<Unit> harvestWorkers, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestBase = null;
@@ -272,7 +273,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    ///跟新：个体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
+    //更新：个体采矿行为（把工兵采集到的资源都先放在基地然后在采取其他行为，充分利用了资源）
     public void harvestWorkerBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestBase = null;
@@ -315,7 +316,7 @@ public class BronzeAI extends AbstractionLayerAI {
         }
     }
 
-    //更新代码：攻击过程中，优先攻击工兵，在攻击基地（小地图很有效）,
+    //更新代码：攻击过程中，优先攻击工兵，再攻击基地（小地图很有效）
     public void meleeBehavior(Unit u, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
         Unit closestEnemy = null;
@@ -345,10 +346,11 @@ public class BronzeAI extends AbstractionLayerAI {
             attack(u, null);
         }
     }
-    //-----------------------------------策略一结束--------------------------------
+    
+    //-----------------------------------策略1结束--------------------------------
 
 
-    //-----------------------------------策略二----------------------------------
+    //-----------------------------------策略2----------------------------------
 
     /**
      * @param p
@@ -634,7 +636,6 @@ public class BronzeAI extends AbstractionLayerAI {
 
 
     }
-
 
     public void meleeCloseGroup(List<Unit> group, Player p, GameState gs) {
         PhysicalGameState pgs = gs.getPhysicalGameState();
